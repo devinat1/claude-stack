@@ -1,6 +1,6 @@
 {
   "name": "claude-stack",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Graphite-like plan stack manager for Claude Code",
   "type": "module",
   "main": "dist/cli/index.js",
