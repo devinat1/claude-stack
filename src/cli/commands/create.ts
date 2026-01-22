@@ -1,5 +1,7 @@
 import chalk from 'chalk';
 import inquirer from 'inquirer';
+import { CheckboxPlusPrompt } from 'inquirer-ts-checkbox-plus-prompt';
+import fuzzy from 'fuzzy';
 import {
   createStack,
   addPlansToStack,
@@ -8,6 +10,8 @@ import {
 } from '../../core/stack-manager.js';
 import { loadAllPlans } from '../../core/plan-parser.js';
 import { isInitialized } from '../../storage/config.js';
+
+inquirer.registerPrompt('checkbox-plus', CheckboxPlusPrompt);
 
 interface CreateOptions {
   plans?: string[];
@@ -190,26 +194,39 @@ const createInteractive = async ({
     return a.planId.localeCompare(b.planId);
   });
 
-  const choices = sortedPlans.map((plan) => ({
-    name: `${plan.planId} - ${plan.title}`,
-    value: plan.planId,
-    short: plan.planId,
-  }));
-
-  console.log(chalk.dim('Use ↑↓ to navigate, Space to select, Enter to confirm'));
+  console.log(chalk.dim('Type to search, ↑↓ to navigate, Space to select, Enter to confirm'));
   console.log();
 
   const { selectedPlans } = await inquirer.prompt<{ selectedPlans: string[] }>([
     {
-      type: 'checkbox',
+      type: 'checkbox-plus' as const,
       name: 'selectedPlans',
       message: exists
         ? `Select plans to add to '${stackName}':`
         : `Select plans for new stack '${stackName}':`,
-      choices,
       pageSize: 20,
+      highlight: true,
+      searchable: true,
+      source: async (_answersSoFar: unknown, input: string | undefined) => {
+        const searchTerm = input ?? '';
+        if (searchTerm === '') {
+          return sortedPlans.map((plan) => ({
+            name: `${plan.planId} - ${plan.title}`,
+            value: plan.planId,
+            short: plan.planId,
+          }));
+        }
+        const results = fuzzy.filter(searchTerm, sortedPlans, {
+          extract: (plan) => `${plan.planId} ${plan.title}`,
+        });
+        return results.map((result) => ({
+          name: `${result.original.planId} - ${result.original.title}`,
+          value: result.original.planId,
+          short: result.original.planId,
+        }));
+      },
     },
-  ]);
+  ] as Parameters<typeof inquirer.prompt>[0]);
 
   if (selectedPlans.length === 0) {
     console.log(chalk.yellow('No plans selected.'));
